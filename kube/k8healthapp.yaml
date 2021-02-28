@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: k8healthapp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: k8healthapp
+  template:
+    metadata:
+      labels:
+        app: k8healthapp
+    spec:
+      containers:
+        - name: app
+          image: localhost:5000/k8healthapp
+          ports:
+            - containerPort: 8080
+          imagePullPolicy: IfNotPresent
