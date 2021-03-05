@@ -1,9 +1,74 @@
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: pvc-cinder01
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 50Mi
+  storageClassName: standard
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: pvc-sfs01
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 50Mi
+  storageClassName: nfs-default-storage-class
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: k8healthcheck-gin
+spec:
+  tls:
+    termination: edge
+  to:
+    kind: Service
+    name: k8healthcheck
+    weight: 100
+  wildcardPolicy: None
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: k8healthcheck-internet
+spec:
+  host: k8healthcheck.apps.fr4.di-paas.diod.orange.com
+  tls:
+    termination: edge
+  to:
+    kind: Service
+    name: k8healthcheck
+    weight: 100
+  wildcardPolicy: None
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: k8healthcheck
+spec:
+  selector:
+    app: k8healthapp
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8080
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: k8healthapp
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: k8healthapp
@@ -14,7 +79,27 @@ spec:
     spec:
       containers:
         - name: app
-          image: localhost:5000/k8healthapp
+          image: dockerfactory-iva.si.francetelecom.fr/openshift4/k8healthcheck:1.11
+          resources:
+            limits:
+              cpu: "250m"
+            requests:
+              cpu: "250m"
+          env:
+            - name: PvBaseDir
+              value: /pv/
+          volumeMounts:
+            - name: cinder01
+              mountPath: /pv/cinder01
+            - name: sfs01
+              mountPath: /pv/sfs01
           ports:
             - containerPort: 8080
           imagePullPolicy: IfNotPresent
+      volumes:
+        - name: cinder01
+          persistentVolumeClaim:
+            claimName: pvc-cinder01
+        - name: sfs01
+          persistentVolumeClaim:
+            claimName: pvc-sfs01
